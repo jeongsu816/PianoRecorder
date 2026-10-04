@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,6 +69,8 @@ fun RecordingsScreen(vm: MainViewModel, onRecordClick: () -> Unit) {
 
     var renaming by remember { mutableStateOf<Recording?>(null) }
     var deleting by remember { mutableStateOf<Recording?>(null) }
+    var sharing by remember { mutableStateOf<Recording?>(null) }
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(message) {
@@ -118,6 +121,10 @@ fun RecordingsScreen(vm: MainViewModel, onRecordClick: () -> Unit) {
                         onStop = vm::stopPlayback,
                         onRename = { renaming = rec },
                         onDelete = { deleting = rec },
+                        onShare = {
+                            val kinds = shareKinds(rec)
+                            if (kinds.size == 1) share(context, rec, kinds[0]) else sharing = rec
+                        },
                     )
                 }
             }
@@ -128,6 +135,29 @@ fun RecordingsScreen(vm: MainViewModel, onRecordClick: () -> Unit) {
         RenameDialog(rec, onDismiss = { renaming = null }) { newName ->
             vm.rename(rec, newName).also { if (it == null) renaming = null }
         }
+    }
+    sharing?.let { rec ->
+        AlertDialog(
+            onDismissRequest = { sharing = null },
+            title = { Text("무엇을 보낼까요?") },
+            text = {
+                Column {
+                    shareKinds(rec).forEach { kind ->
+                        TextButton(onClick = { sharing = null; share(context, rec, kind) }, Modifier.fillMaxWidth()) {
+                            Text(kind.label, Modifier.fillMaxWidth())
+                        }
+                    }
+                    Text(
+                        "보통은 소리(m4a)를 보내면 돼요. MIDI는 피아노나 음악 프로그램에서 열 수 있어요.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { sharing = null }) { Text("취소") } },
+        )
     }
     deleting?.let { rec ->
         AlertDialog(
@@ -205,6 +235,7 @@ private fun RecordingItem(
     onStop: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Card(
         Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick),
@@ -232,6 +263,8 @@ private fun RecordingItem(
                             enabled = true, Modifier.weight(1f), { onPlay(Target.PHONE) }, onStop)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = onShare) { Text("공유") }
+                        Spacer(Modifier.width(4.dp))
                         TextButton(onClick = onRename) { Text("이름 변경") }
                         Spacer(Modifier.width(4.dp))
                         TextButton(onClick = onDelete) { Text("삭제", color = MaterialTheme.colorScheme.error) }
