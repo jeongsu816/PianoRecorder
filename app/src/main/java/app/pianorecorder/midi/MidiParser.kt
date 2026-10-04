@@ -1,4 +1,4 @@
-package app.pianorecorder.probe
+package app.pianorecorder.midi
 
 /**
  * MIDI 1.0 바이트 스트림 → 완결된 메시지 단위로 자르는 파서.

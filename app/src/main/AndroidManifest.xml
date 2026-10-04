@@ -5,14 +5,17 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 재설치 전에 만든 녹음을 목록에 보이기 위한 읽기 권한 (내가 만든 파일은 권한 없이 보임) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application
         android:label="@string/app_name"
         android:theme="@android:style/Theme.Material.NoActionBar">
-        <!-- Probe 단계: 회전 시 Activity 재생성으로 열린 MIDI 장치/녹음이 끊기지 않도록 -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
