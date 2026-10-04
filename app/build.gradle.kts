@@ -18,9 +18,24 @@ android {
         versionName = "0.2-mvp"
     }
 
+    // 릴리스 서명 정보는 저장소에 두지 않고 환경변수로만 받는다 (scripts/release.sh가 Vaultwarden에서 꺼내 넣음).
+    // 환경변수가 없으면 release 서명 설정을 만들지 않으므로, 서명 없이는 릴리스 APK가 나오지 않는다.
+    val releaseKeystore = providers.environmentVariable("PIANORECORDER_KEYSTORE").orNull
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = providers.environmentVariable("PIANORECORDER_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("PIANORECORDER_KEY_ALIAS").getOrElse("pianorecorder")
+                keyPassword = storePassword // PKCS12는 키스토어와 키의 비밀번호가 같다
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

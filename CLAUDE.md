@@ -161,6 +161,11 @@
 
 ### 5.7 서명 / 설치 / 디버깅
 - **릴리스 키스토어를 하나 만들어 고정**하고 NAS에 백업. 디버그 키는 PC마다 달라 업데이트 시 서명 불일치 발생
+- 서명 비밀번호 관리: Vaultwarden(NAS) 항목 `PianoRecorder release keystore` (사용자 이름 = alias `pianorecorder`, 비밀번호 = 키스토어 비밀번호)
+  - 키스토어: PKCS12, RSA 4096, `~/.android-keys/pianorecorder-release.jks` (저장소 밖)
+  - `app/build.gradle.kts`는 환경변수(`PIANORECORDER_KEYSTORE` / `_KEYSTORE_PASSWORD` / `_KEY_ALIAS`)로만 서명 정보를 받음. 없으면 unsigned
+  - `scripts/release.sh`: `bw`로 비밀번호를 꺼내 `--no-daemon`으로 빌드(데몬에 비밀번호가 남지 않게), 서명 지문·SHA-256 출력
+  - Vaultwarden 내보내기에는 첨부 파일이 포함되지 않음 → 키스토어 파일은 따로 NAS 밖에도 백업
 - 아이 폰 첫 설치: Family Link 부모 앱 → 아이 프로필 → 로그인된 기기 → 개발자 옵션 허용 → USB 디버깅 → `adb install` → **설치 후 개발자 옵션 다시 끄기**
 - 개발 중 디버깅은 **무선 디버깅** 사용: 폰의 USB 단자를 피아노(호스트 모드)에 써야 해서 USB 디버깅(디바이스 모드)과 동시 사용 불가
 
