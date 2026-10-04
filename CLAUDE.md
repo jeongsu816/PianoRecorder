@@ -162,7 +162,10 @@
 ### 5.7 서명 / 설치 / 디버깅
 - **릴리스 키스토어를 하나 만들어 고정**하고 NAS에 백업. 디버그 키는 PC마다 달라 업데이트 시 서명 불일치 발생
 - 서명 비밀번호 관리: Vaultwarden(NAS) 항목 `PianoRecorder release keystore` (사용자 이름 = alias `pianorecorder`, 비밀번호 = 키스토어 비밀번호)
-  - 키스토어: PKCS12, RSA 4096, `~/.android-keys/pianorecorder-release.jks` (저장소 밖)
+  - 키스토어: PKCS12, RSA 4096, `~/.android-keys/pianorecorder-release.jks` (저장소 밖), 2026-10-04 생성
+    - 파일 암호화 [확인]: PBES2 / PBKDF2-HMAC-SHA256 10000회 / AES-256-CBC, MAC SHA-256
+    - 인증서 DN `CN=PianoRecorder`, **SHA-256 지문 `ce16a44624be8b244061b34ab24fd54d51eb77059501e1a95ac10cab4c7629d4`** (공개 값, 서명 확인용)
+    - APK 서명 방식: v2만 (minSdk 29라 v1 불필요)
   - `app/build.gradle.kts`는 환경변수(`PIANORECORDER_KEYSTORE` / `_KEYSTORE_PASSWORD` / `_KEY_ALIAS`)로만 서명 정보를 받음. 없으면 unsigned
   - `scripts/release.sh`: `bw`로 비밀번호를 꺼내 `--no-daemon`으로 빌드(데몬에 비밀번호가 남지 않게), 서명 지문·SHA-256 출력
   - Vaultwarden 내보내기에는 첨부 파일이 포함되지 않음 → 키스토어 파일은 따로 NAS 밖에도 백업
