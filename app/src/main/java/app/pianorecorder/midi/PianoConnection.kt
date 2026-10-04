@@ -66,11 +66,17 @@ class PianoConnection(context: Context) {
 
     private val callback = object : MidiManager.DeviceCallback() {
         override fun onDeviceAdded(info: MidiDeviceInfo) {
-            if (device == null && info.type == MidiDeviceInfo.TYPE_USB) open(info)
+            Log.i(TAG, "장치 추가 id=${info.id} type=${info.type}")
+            if (info.type == MidiDeviceInfo.TYPE_USB) open(info)
         }
 
         override fun onDeviceRemoved(info: MidiDeviceInfo) {
-            if (device?.info?.id == info.id) close()
+            Log.i(TAG, "장치 제거 id=${info.id}")
+            if (device?.info?.id == info.id) {
+                close()
+                // 다시 꽂을 때 "추가"가 "제거"보다 먼저 오면 새 장치를 못 연 채로 남으므로 한 번 더 찾는다
+                openFirstUsb()
+            }
         }
     }
 
@@ -82,7 +88,7 @@ class PianoConnection(context: Context) {
             midiManager.registerDeviceCallback(callback, handler)
         }
         // 콜백 등록 전부터 꽂혀 있던 장치
-        handler.post { devices().firstOrNull { it.type == MidiDeviceInfo.TYPE_USB }?.let(::open) }
+        handler.post(::openFirstUsb)
     }
 
     private fun devices(): List<MidiDeviceInfo> =
@@ -93,17 +99,41 @@ class PianoConnection(context: Context) {
             midiManager.devices.toList()
         }
 
-    /** handler 스레드에서만 호출 */
-    private fun open(info: MidiDeviceInfo) {
-        if (device != null) return
+    private fun openFirstUsb() {
+        devices().firstOrNull { it.type == MidiDeviceInfo.TYPE_USB }?.let(::open)
+    }
+
+    /** openDevice가 비동기라서, 결과가 오기 전 두 번째 open을 막는 표시 */
+    private var opening = false
+
+    /**
+     * handler 스레드에서만 호출.
+     *
+     * 주의: 같은 장치를 두 번 열면 두 번째의 openInputPort가 null이다(입력 포트는 한 곳만 열 수 있음).
+     * 예전 코드는 그 null로 정상 포트를 덮어써서 "녹음(출력 포트)은 되는데 피아노 재생(입력 포트)만
+     * 소리 없이 실패"했다. → [opening]으로 중복 open을 막고, 두 포트가 모두 열려야 연결로 본다.
+     */
+    private fun open(info: MidiDeviceInfo, attempt: Int = 1) {
+        if (device != null || opening) return
+        opening = true
         midiManager.openDevice(info, { dev ->
-            if (dev == null) { Log.w(TAG, "openDevice 실패"); return@openDevice }
+            opening = false
+            if (dev == null) { Log.w(TAG, "openDevice 실패 (시도 $attempt)"); retry(info, attempt); return@openDevice }
             device = dev
-            if (info.outputPortCount > 0) outputPort = dev.openOutputPort(0)?.also { it.connect(receiver) }
-            if (info.inputPortCount > 0) inputPort = dev.openInputPort(0)
-            Log.i(TAG, "피아노 연결: out=${outputPort != null} in=${inputPort != null}")
-            _connected.value = outputPort != null
+            outputPort = if (info.outputPortCount > 0) dev.openOutputPort(0)?.also { it.connect(receiver) } else null
+            inputPort = if (info.inputPortCount > 0) dev.openInputPort(0) else null
+            Log.i(TAG, "피아노 연결 id=${info.id}: out=${outputPort != null} in=${inputPort != null} (시도 $attempt)")
+            if (outputPort != null && inputPort != null) _connected.value = true
+            else { close(); retry(info, attempt) }
         }, handler)
+    }
+
+    /** 꽂은 직후에는 장치가 덜 준비됐을 수 있어 잠시 뒤 다시 시도 [추측] */
+    private fun retry(info: MidiDeviceInfo, attempt: Int) {
+        if (attempt >= 5) { Log.e(TAG, "피아노 연결 포기"); return }
+        handler.postDelayed({
+            if (devices().any { it.id == info.id }) open(info, attempt + 1)
+        }, 500L * attempt)
     }
 
     private fun close() {

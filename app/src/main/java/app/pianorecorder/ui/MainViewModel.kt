@@ -4,10 +4,8 @@ import android.app.Application
 import android.content.IntentSender
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import app.pianorecorder.midi.PianoConnection
+import app.pianorecorder.PianoApp
 import app.pianorecorder.midi.Smf
-import app.pianorecorder.playback.MidiPlayer
-import app.pianorecorder.playback.PhonePlayer
 import app.pianorecorder.record.Recorder
 import app.pianorecorder.storage.NeedsConsentException
 import app.pianorecorder.storage.Recording
@@ -32,11 +30,12 @@ class ConsentRequest(val intentSender: IntentSender, val onGranted: () -> Unit)
  *  - 피아노 연결이 끊기면 녹음은 그때까지 저장, 피아노 재생은 중지
  */
 class MainViewModel(app: Application) : AndroidViewModel(app) {
-    val piano = PianoConnection(app)
-    private val store = RecordingStore(app)
-    val recorder = Recorder(app, piano, store)
-    private val midiPlayer = MidiPlayer(piano)
-    private val phonePlayer = PhonePlayer(app)
+    private val graph = app as PianoApp
+    val piano = graph.piano
+    private val store = graph.store
+    val recorder = graph.recorder
+    private val midiPlayer = graph.midiPlayer
+    private val phonePlayer = graph.phonePlayer
 
     private val _recordings = MutableStateFlow<List<Recording>>(emptyList())
     val recordings: StateFlow<List<Recording>> = _recordings
@@ -126,7 +125,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         return@launch
                     }
                     _playing.value = Playing(rec.name, Target.PIANO)
-                    midiPlayer.play(events) { _playing.compareAndSet(Playing(rec.name, Target.PIANO), null) }
+                    midiPlayer.play(events) { failed ->
+                        _playing.compareAndSet(Playing(rec.name, Target.PIANO), null)
+                        if (failed) _message.value = "피아노로 보내지 못했어요. 케이블을 다시 꽂아 주세요"
+                    }
                 }
             }
             Target.PHONE -> {
@@ -185,9 +187,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 화면을 완전히 닫을 때(뒤로 가기 등). 피아노 연결은 프로세스 소유라 여기서 닫지 않는다. */
     override fun onCleared() {
         stopPlayback()
-        if (recorder.state.value is Recorder.State.Recording) runCatching { recorder.stop() }
-        piano.release()
+        // 화면 없이 녹음이 계속되지 않도록 저장하고 끝낸다 (stop은 블로킹이라 메인 스레드 밖에서)
+        if (recorder.state.value is Recorder.State.Recording) Thread { runCatching { recorder.stop() } }.start()
     }
 }

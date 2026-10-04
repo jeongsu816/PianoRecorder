@@ -15,12 +15,13 @@ class MidiPlayer(private val piano: PianoConnection) {
     @Volatile private var thread: Thread? = null
     @Volatile private var stopRequested = false
 
-    /** [onEnd]는 재생 스레드에서 호출된다 (끝까지 재생, 중지, 연결 끊김 모두). */
-    fun play(events: List<MidiEvent>, onEnd: () -> Unit) {
+    /** [onEnd]는 재생 스레드에서 호출된다. sendFailed = 피아노로 보내지 못해 중단됨 */
+    fun play(events: List<MidiEvent>, onEnd: (sendFailed: Boolean) -> Unit) {
         stop()
         stopRequested = false
         thread = Thread({
             val start = System.nanoTime()
+            var failed = false
             try {
                 for (e in events) {
                     val target = start + e.timeMs * 1_000_000
@@ -30,11 +31,11 @@ class MidiPlayer(private val piano: PianoConnection) {
                         LockSupport.parkNanos(wait)
                     }
                     if (stopRequested) break
-                    if (!piano.send(e.data)) break // 케이블이 빠짐
+                    if (!piano.send(e.data)) { failed = true; break } // 케이블이 빠졌거나 송신 포트 없음
                 }
             } finally {
                 allNotesOff()
-                onEnd()
+                onEnd(failed)
             }
         }, "midi-play").apply { start() }
     }
