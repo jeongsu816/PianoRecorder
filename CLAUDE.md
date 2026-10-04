@@ -188,7 +188,7 @@
 
 성공 기준: MIDI 이벤트 수신 + 오디오 녹음 동시 동작, 피아노로 MIDI 송신 시 소리 남 → **모두 충족**
 
-### Step 2. MVP — 구현 완료, 실기기 테스트 중 (2026-10-04)
+### Step 2. MVP — ✅ 완료 (2026-10-04)
 - 녹음(오디오+MIDI) → MediaStore 저장 → 목록 표시 → 두 가지 재생 → 삭제/이름 변경
 - 구조: `midi/`(MidiParser, Smf, PianoConnection) · `record/Recorder` · `storage/RecordingStore` ·
   `playback/`(MidiPlayer, PhonePlayer) · `ui/`(MainViewModel, RecordingsScreen)
@@ -205,9 +205,13 @@
     - 약 23ms는 AAC 인코더 프라이밍 [추측]: MediaMuxer가 edit list(elst)를 쓰지 않아 디코더가 앞 여백까지 재생
     - 나머지 약 40ms는 피아노 내부(건반 → 음원 → USB 오디오) 지연 [추측]
     - 각 재생은 자기 파일만 쓰므로 지금은 영향 없음. 오버더빙 등 두 파일을 겹칠 때 상수로 보정
-- 확인할 것: `setPreferredDevice(BUILTIN_SPEAKER)`가 USB 연결 중에도 지켜지는지 (`routedDevice`는 start 직후 null이라 로그로 판단 불가)
+  - **"폰으로" 재생이 케이블 연결 중에도 폰 스피커에서만 나옴** → `MediaPlayer.setPreferredDevice(BUILTIN_SPEAKER)`가 지켜짐 (사용자 확인)
+  - "피아노로" 재생이 원래 연주처럼 자연스러움 (사용자 확인)
+  - 카톡 첨부 화면에서 녹음 파일이 보임 (사용자 확인)
+  - (`routedDevice`는 start 직후 null이라 로그로는 출력 장치를 판단할 수 없음)
+  - 녹음 중 음색 변경 → 재생 시 음색 재현은 아직 테스트 안 함
 
-### Step 3. 부가 기능
+### Step 3. 부가 기능 — 다음 할 일
 - 공유, USB 연결 자동 실행, 자체 업데이트 모듈
 
 ### 향후 아이디어
