@@ -197,8 +197,15 @@
 - SMF: Format 0, 템포 120 + 분해능 500 → 1 tick = 1ms
 - 녹음 중 화면 꺼짐 방지(FLAG_KEEP_SCREEN_ON). 전원 버튼으로 끄면 백그라운드 마이크 제한에 걸릴 수 있음
   → 필요하면 나중에 마이크 타입 포그라운드 서비스로 보강
-- 확인할 것: `.mid`가 MediaStore.Audio에 들어가는지, `setPreferredDevice(BUILTIN_SPEAKER)`가 USB 연결 중에도 지켜지는지,
-  getTimestamp 보정 후 오디오와 MIDI가 맞는지
+- [확인] 2026-10-04 MVP 1차 테스트
+  - `.mid`(`audio/midi`)가 `MediaStore.Audio` 컬렉션에 정상 저장됨 → Files/Downloads 대안 불필요
+  - 녹음 → 저장 → 한글 이름 변경(두 파일 함께) → 삭제 동작
+  - getTimestamp 보정량이 녹음마다 크게 다름(309ms, 117ms) → 호출 시각 기준으로는 못 맞춤, 보정이 필수
+  - 보정 후 오디오가 MIDI보다 **62ms 늦음, 음 16개 모두 59~65ms**(고정 지연)
+    - 약 23ms는 AAC 인코더 프라이밍 [추측]: MediaMuxer가 edit list(elst)를 쓰지 않아 디코더가 앞 여백까지 재생
+    - 나머지 약 40ms는 피아노 내부(건반 → 음원 → USB 오디오) 지연 [추측]
+    - 각 재생은 자기 파일만 쓰므로 지금은 영향 없음. 오버더빙 등 두 파일을 겹칠 때 상수로 보정
+- 확인할 것: `setPreferredDevice(BUILTIN_SPEAKER)`가 USB 연결 중에도 지켜지는지 (`routedDevice`는 start 직후 null이라 로그로 판단 불가)
 
 ### Step 3. 부가 기능
 - 공유, USB 연결 자동 실행, 자체 업데이트 모듈
