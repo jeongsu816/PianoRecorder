@@ -136,7 +136,8 @@
 ### 5.4 공유
 - MediaStore content URI를 `ACTION_SEND`에 넣고 `FLAG_GRANT_READ_URI_PERMISSION` → FileProvider 불필요
 - 기본은 m4a 공유, MIDI는 옵션
-- [미확인] 메신저별로 음성 메시지처럼 보내지는지, 파일로 보내지는지
+- [확인] 카톡: m4a·mid 모두 **파일**로 전송됨(음성 메시지 아님). "둘 다"(ACTION_SEND_MULTIPLE)도 두 파일 함께 전송됨
+- 구현: 두 파일이 있으면 "소리 / MIDI / 둘 다" 선택, 하나뿐이면 바로 공유 (`ui/Share.kt`)
 
 ### 5.5 USB 연결 자동 실행
 - 매니페스트에 `USB_DEVICE_ATTACHED` 인텐트 필터 + 디바이스 필터(Roland 벤더 ID)
