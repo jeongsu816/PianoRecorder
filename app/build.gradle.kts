@@ -14,8 +14,8 @@ android {
         applicationId = "app.pianorecorder"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.3"
+        versionCode = 7
+        versionName = "1.4"
     }
 
     // 릴리스 서명 정보는 저장소에 두지 않고 환경변수로만 받는다 (scripts/release.sh가 Vaultwarden에서 꺼내 넣음).

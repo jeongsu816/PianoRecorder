@@ -78,11 +78,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refresh() {
-        viewModelScope.launch {
-            _volumes.value = withContext(Dispatchers.IO) { runCatching { Volumes.available(getApplication()) }.getOrDefault(emptyList()) }
-            _recordings.value = withContext(Dispatchers.IO) { runCatching { store.list() }.getOrDefault(emptyList()) }
-        }
+        viewModelScope.launch { reload() }
     }
+
+    private suspend fun reload() {
+        _volumes.value = withContext(Dispatchers.IO) { runCatching { Volumes.available(getApplication()) }.getOrDefault(emptyList()) }
+        _recordings.value = withContext(Dispatchers.IO) { runCatching { store.list() }.getOrDefault(emptyList()) }
+    }
+
+    /** 값이 바뀔 때마다 화면이 목록을 맨 위로 올린다 (새 녹음은 최신순 목록의 맨 위에 생긴다) */
+    private val _scrollToTop = MutableStateFlow(0)
+    val scrollToTop: StateFlow<Int> = _scrollToTop
 
     fun select(id: String) {
         _selected.value = if (_selected.value == id) null else id
@@ -119,8 +125,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val id = (recorder.state.value as? Recorder.State.Recording)?.let { "${it.volume}/${it.name}" }
             try {
                 withContext(Dispatchers.IO) { recorder.stop() }
-                refresh()
+                reload() // 목록이 갱신된 뒤에 올려야 새 항목이 맨 위에 보인다
                 _selected.value = id
+                _scrollToTop.value++
             } catch (e: Exception) {
                 _message.value = "녹음 저장 실패: ${e.message}"
             }

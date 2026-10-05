@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -89,6 +90,12 @@ fun RecordingsScreen(vm: MainViewModel, onRecordClick: () -> Unit) {
     var sharing by remember { mutableStateOf<Recording?>(null) }
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
+    val listState = rememberLazyListState()
+    val scrollToTop by vm.scrollToTop.collectAsStateWithLifecycle()
+
+    LaunchedEffect(scrollToTop) {
+        if (scrollToTop > 0) listState.animateScrollToItem(0)
+    }
 
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.consumeMessage() }
@@ -132,6 +139,7 @@ fun RecordingsScreen(vm: MainViewModel, onRecordClick: () -> Unit) {
                 } else {
                     LazyColumn(
                         Modifier.fillMaxSize(),
+                        state = listState,
                         contentPadding = PaddingValues(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
