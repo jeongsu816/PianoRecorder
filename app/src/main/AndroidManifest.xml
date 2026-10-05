@@ -20,11 +20,14 @@
         <!--
             singleTask: 앱이 이미 떠 있을 때 피아노를 꽂으면 화면을 하나 더 만들지 않고 기존 화면으로 돌아간다.
             USB_DEVICE_ATTACHED: 피아노를 꽂으면 "이 앱으로 열기" 창 → "항상" 선택 시 이후 바로 실행.
+            fullSensor: 폰의 "자동 회전" 설정과 무관하게 기울기대로 돌린다. USB를 꽂으면 폰을 옆으로 눕히게 되는데,
+                        아이 폰은 자동 회전이 꺼져 있을 때가 많아서. (큰 화면 기기에서는 Android 16+가 이 값을 무시함)
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:screenOrientation="fullSensor">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
