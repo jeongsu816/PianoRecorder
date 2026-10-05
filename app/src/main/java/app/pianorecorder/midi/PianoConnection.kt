@@ -60,8 +60,14 @@ class PianoConnection(context: Context) {
     fun currentSetup(): List<ByteArray> = synchronized(setup) { setup.values.toList() }
 
     private val receiver = object : MidiReceiver() {
-        override fun onSend(msg: ByteArray, offset: Int, count: Int, timestamp: Long) =
+        override fun onSend(msg: ByteArray, offset: Int, count: Int, timestamp: Long) {
+            // 진단용: OS가 메시지를 몇 개씩, 얼마나 늦게 넘겨주는지 (S20에서 화음이 ~100ms 어긋나 기록되는 문제 조사)
+            if (Log.isLoggable(DIAG_TAG, Log.DEBUG)) {
+                val hex = (offset until offset + count).joinToString(" ") { "%02X".format(msg[it]) }
+                Log.d(DIAG_TAG, "onSend n=$count lag=${(System.nanoTime() - timestamp) / 1000}µs [$hex]")
+            }
             parser.feed(msg, offset, count, timestamp)
+        }
     }
 
     private val callback = object : MidiManager.DeviceCallback() {
@@ -166,5 +172,7 @@ class PianoConnection(context: Context) {
 
     companion object {
         private const val TAG = "PianoConnection"
+        /** `adb shell setprop log.tag.MidiIn DEBUG`로 켠다 (기본은 꺼짐) */
+        private const val DIAG_TAG = "MidiIn"
     }
 }

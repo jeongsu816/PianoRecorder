@@ -6,3 +6,7 @@ local.properties
 .kotlin/
 *.jks
 *.keystore
+
+# 테스트용 녹음 파일 (아이 연주, 공개 금지)
+temp/
+*:Zone.Identifier
