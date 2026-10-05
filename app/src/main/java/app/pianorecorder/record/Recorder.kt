@@ -31,7 +31,7 @@ import java.util.Locale
  *
  * 시간 맞춤: Probe에서 startRecording() 호출 시각을 기준으로 잡으면 오디오가 MIDI보다 약 0.1초
  * 앞서는 것을 확인했다. 그래서 AudioRecord.getTimestamp()가 알려 주는 "프레임 n이 녹음된 nanoTime"으로
- * 오디오 첫 프레임의 실제 시각을 역산하고, MIDI 이벤트 시각(onSend timestamp, 같은 nanoTime 기준)을
+ * 오디오 첫 프레임의 실제 시각을 역산하고, MIDI 이벤트 시각(받은 순간의 nanoTime, PianoConnection 참고)을
  * 그 시각 기준으로 바꿔 SMF에 쓴다. → 두 파일의 0초가 같은 순간을 가리킨다.
  */
 class Recorder(

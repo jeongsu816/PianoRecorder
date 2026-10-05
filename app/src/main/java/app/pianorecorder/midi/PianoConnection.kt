@@ -33,7 +33,7 @@ class PianoConnection(context: Context) {
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected
 
-    /** 녹음기가 설정. 채널 메시지(노트·페달 등)만 전달하고 timestamp는 System.nanoTime 기준. */
+    /** 녹음기가 설정. 채널 메시지(노트·페달 등)만 전달하고 시각은 받은 순간의 System.nanoTime. */
     @Volatile var listener: ((msg: ByteArray, timestampNanos: Long) -> Unit)? = null
 
     /**
@@ -60,13 +60,21 @@ class PianoConnection(context: Context) {
     fun currentSetup(): List<ByteArray> = synchronized(setup) { setup.values.toList() }
 
     private val receiver = object : MidiReceiver() {
+        /**
+         * OS가 넘겨주는 timestamp 대신 "받은 시각"을 쓴다.
+         *
+         * 갤럭시 S20(Android 13)에서는 timestamp가 이 메시지가 아니라 **직전 메시지를 받은 시각**으로 온다
+         * (2026-10-05 로그 확인: lag = 직전 메시지와의 간격). 그래서 화음의 첫 음이 직전 뗌 시각으로 찍혀
+         * 두 음이 ~100ms 어긋나 기록됐다. 전달 자체는 늦지 않아서 받은 시각이 실제 시각에 가깝다.
+         * 폴드8(Android 17)은 timestamp가 정상이고 받은 시각과의 차이도 1~4ms라 이쪽으로 통일해도 손해가 없다.
+         */
         override fun onSend(msg: ByteArray, offset: Int, count: Int, timestamp: Long) {
-            // 진단용: OS가 메시지를 몇 개씩, 얼마나 늦게 넘겨주는지 (S20에서 화음이 ~100ms 어긋나 기록되는 문제 조사)
+            val now = System.nanoTime()
             if (Log.isLoggable(DIAG_TAG, Log.DEBUG)) {
                 val hex = (offset until offset + count).joinToString(" ") { "%02X".format(msg[it]) }
-                Log.d(DIAG_TAG, "onSend n=$count lag=${(System.nanoTime() - timestamp) / 1000}µs [$hex]")
+                Log.d(DIAG_TAG, "onSend n=$count lag=${(now - timestamp) / 1000}µs [$hex]")
             }
-            parser.feed(msg, offset, count, timestamp)
+            parser.feed(msg, offset, count, now)
         }
     }
 
@@ -172,7 +180,7 @@ class PianoConnection(context: Context) {
 
     companion object {
         private const val TAG = "PianoConnection"
-        /** `adb shell setprop log.tag.MidiIn DEBUG`로 켠다 (기본은 꺼짐) */
+        /** 진단 로그. `adb shell setprop log.tag.MidiIn DEBUG`로 켠다 (기본은 꺼짐) */
         private const val DIAG_TAG = "MidiIn"
     }
 }
