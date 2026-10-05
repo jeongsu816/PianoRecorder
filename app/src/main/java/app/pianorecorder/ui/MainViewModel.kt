@@ -10,6 +10,8 @@ import app.pianorecorder.record.Recorder
 import app.pianorecorder.storage.NeedsConsentException
 import app.pianorecorder.storage.Recording
 import app.pianorecorder.storage.RecordingStore
+import app.pianorecorder.storage.Volume
+import app.pianorecorder.storage.Volumes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +20,8 @@ import kotlinx.coroutines.withContext
 
 enum class Target { PIANO, PHONE }
 
-data class Playing(val name: String, val target: Target)
+/** [id] = [Recording.id] (볼륨/이름) */
+data class Playing(val id: String, val target: Target)
 
 /** 사용자 확인 창(재설치 후 이전 파일 수정/삭제)을 띄운 뒤, 승인되면 실행할 작업 */
 class ConsentRequest(val intentSender: IntentSender, val onGranted: () -> Unit)
@@ -36,10 +39,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val recorder = graph.recorder
     private val midiPlayer = graph.midiPlayer
     private val phonePlayer = graph.phonePlayer
+    private val settings = graph.settings
+
+    /** 선택한 저장 위치(MediaStore 볼륨 이름) */
+    val storageVolume: StateFlow<String> = settings.storageVolume
+
+    /** 지금 쓸 수 있는 저장 위치들. SD 카드를 넣고 빼는 것을 반영하려고 refresh 때마다 다시 읽는다. */
+    private val _volumes = MutableStateFlow<List<Volume>>(emptyList())
+    val volumes: StateFlow<List<Volume>> = _volumes
 
     private val _recordings = MutableStateFlow<List<Recording>>(emptyList())
     val recordings: StateFlow<List<Recording>> = _recordings
 
+    /** 펼쳐진 녹음의 [Recording.id] */
     private val _selected = MutableStateFlow<String?>(null)
     val selected: StateFlow<String?> = _selected
 
@@ -67,13 +79,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refresh() {
         viewModelScope.launch {
+            _volumes.value = withContext(Dispatchers.IO) { runCatching { Volumes.available(getApplication()) }.getOrDefault(emptyList()) }
             _recordings.value = withContext(Dispatchers.IO) { runCatching { store.list() }.getOrDefault(emptyList()) }
         }
     }
 
-    fun select(name: String) {
-        _selected.value = if (_selected.value == name) null else name
+    fun select(id: String) {
+        _selected.value = if (_selected.value == id) null else id
     }
+
+    fun setStorageVolume(name: String) = settings.setStorageVolume(name)
 
     fun consumeMessage() { _message.value = null }
     fun consumeConsent() { _consent.value = null }
@@ -83,7 +98,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun startRecording() {
         stopPlayback()
         try {
-            val name = recorder.start()
+            // 고른 SD 카드가 빠져 있으면 녹음을 못 하는 것보다 내장 메모리에라도 저장하는 편이 낫다
+            val available = Volumes.available(getApplication())
+            val preferred = settings.storageVolume.value
+            val volume = if (available.any { it.name == preferred }) preferred else Volumes.PRIMARY
+            if (volume != preferred) _message.value = "SD 카드를 찾을 수 없어 내장 메모리에 저장해요"
+            val name = recorder.start(volume)
             _selected.value = null
             if (recorder.state.value.let { it is Recorder.State.Recording && !it.withAudio }) {
                 _message.value = "피아노 소리(오디오) 입력을 찾지 못해 MIDI만 녹음해요"
@@ -96,11 +116,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stopRecording() {
         viewModelScope.launch {
-            val name = (recorder.state.value as? Recorder.State.Recording)?.name
+            val id = (recorder.state.value as? Recorder.State.Recording)?.let { "${it.volume}/${it.name}" }
             try {
                 withContext(Dispatchers.IO) { recorder.stop() }
                 refresh()
-                _selected.value = name
+                _selected.value = id
             } catch (e: Exception) {
                 _message.value = "녹음 저장 실패: ${e.message}"
             }
@@ -124,9 +144,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         _message.value = "MIDI 파일을 읽지 못했어요: ${e.message}"
                         return@launch
                     }
-                    _playing.value = Playing(rec.name, Target.PIANO)
+                    _playing.value = Playing(rec.id, Target.PIANO)
                     midiPlayer.play(events) { failed ->
-                        _playing.compareAndSet(Playing(rec.name, Target.PIANO), null)
+                        _playing.compareAndSet(Playing(rec.id, Target.PIANO), null)
                         if (failed) _message.value = "피아노로 보내지 못했어요. 케이블을 다시 꽂아 주세요"
                     }
                 }
@@ -135,8 +155,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 // m4a가 없으면 .mid를 폰 내장 신디사이저로
                 val uri = rec.audioUri ?: rec.midiUri ?: return
                 try {
-                    phonePlayer.play(uri) { _playing.compareAndSet(Playing(rec.name, Target.PHONE), null) }
-                    _playing.value = Playing(rec.name, Target.PHONE)
+                    phonePlayer.play(uri) { _playing.compareAndSet(Playing(rec.id, Target.PHONE), null) }
+                    _playing.value = Playing(rec.id, Target.PHONE)
                 } catch (e: Exception) {
                     _message.value = "재생하지 못했어요: ${e.message}"
                 }
@@ -159,7 +179,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         RecordingStore.validateName(name)?.let { return it }
         if (store.exists(name, _recordings.value)) return "같은 이름의 녹음이 이미 있어요"
         stopPlayback()
-        runStoreOp(retryAfterConsent = true, done = { _selected.value = name }) { store.rename(rec, name) }
+        runStoreOp(retryAfterConsent = true, done = { _selected.value = "${rec.volume}/$name" }) { store.rename(rec, name) }
         return null
     }
 

@@ -42,7 +42,12 @@ class Recorder(
     sealed interface State {
         data object Idle : State
         /** [startedAtElapsed]: 화면의 경과 시간 표시용 (SystemClock.elapsedRealtime) */
-        data class Recording(val name: String, val startedAtElapsed: Long, val withAudio: Boolean) : State
+        data class Recording(
+            val name: String,
+            val volume: String,
+            val startedAtElapsed: Long,
+            val withAudio: Boolean,
+        ) : State
     }
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -70,14 +75,14 @@ class Recorder(
     private fun usbInput(): AudioDeviceInfo? = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
         .firstOrNull { it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET }
 
-    /** 호출 전 RECORD_AUDIO 권한 확인 필요. 실패 시 예외. */
-    fun start(): String {
+    /** [volume]: 저장할 MediaStore 볼륨. 호출 전 RECORD_AUDIO 권한 확인 필요. 실패 시 예외. */
+    fun start(volume: String): String {
         check(session == null) { "이미 녹음 중" }
         val name = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
         val input = usbInput()
-        val midiUri = store.createPending(name, RecordingStore.MIDI_EXT)
+        val midiUri = store.createPending(name, RecordingStore.MIDI_EXT, volume)
         val audioUri = input?.let {
-            try { store.createPending(name, RecordingStore.AUDIO_EXT) }
+            try { store.createPending(name, RecordingStore.AUDIO_EXT, volume) }
             catch (e: Exception) { store.discard(midiUri); throw e }
         }
 
@@ -89,7 +94,7 @@ class Recorder(
             Log.w(TAG, "USB 오디오 입력 없음 → MIDI만 녹음")
         }
         session = s
-        _state.value = State.Recording(name, SystemClock.elapsedRealtime(), withAudio = input != null)
+        _state.value = State.Recording(name, volume, SystemClock.elapsedRealtime(), withAudio = input != null)
         return name
     }
 

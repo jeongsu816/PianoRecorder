@@ -15,12 +15,17 @@ import android.provider.MediaStore
  */
 data class Recording(
     val name: String,
+    /** MediaStore 볼륨 이름 (내장 = [Volumes.PRIMARY], 그 외 = microSD 등) */
+    val volume: String,
     val audioUri: Uri?,
     val midiUri: Uri?,
     val durationMs: Long,
     val dateAddedSec: Long,
 ) {
     val uris get() = listOfNotNull(audioUri, midiUri)
+    /** 내장과 SD에 같은 이름이 있을 수 있어 화면에서는 볼륨까지 붙여 구분한다 */
+    val id get() = "$volume/$name"
+    val onRemovable get() = volume != Volumes.PRIMARY
 }
 
 /** 다른 설치본이 만든 파일(재설치 후)을 고치거나 지울 때 사용자 확인이 필요하다는 신호 */
@@ -28,49 +33,53 @@ class NeedsConsentException(val intentSender: IntentSender) : Exception()
 
 class RecordingStore(context: Context) {
     private val resolver = context.contentResolver
-    private val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
 
+    private fun collection(volume: String) = MediaStore.Audio.Media.getContentUri(volume)
+
+    /** VOLUME_EXTERNAL은 마운트된 모든 외부 볼륨(내장 + SD)을 한 번에 조회한다. 빠진 SD 카드의 파일은 안 나온다. */
     fun list(): List<Recording> {
         val projection = arrayOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.DURATION,
             MediaStore.MediaColumns.DATE_ADDED,
+            MediaStore.MediaColumns.VOLUME_NAME,
         )
-        class Row(val uri: Uri, val base: String, val ext: String, val duration: Long, val added: Long)
+        class Row(val uri: Uri, val volume: String, val base: String, val ext: String, val duration: Long, val added: Long)
         val rows = ArrayList<Row>()
         resolver.query(
-            collection, projection,
+            collection(MediaStore.VOLUME_EXTERNAL), projection,
             "${MediaStore.MediaColumns.RELATIVE_PATH} = ?", arrayOf(RELATIVE_PATH), null,
         )?.use { c ->
             while (c.moveToNext()) {
                 val name = c.getString(1) ?: continue
                 val dot = name.lastIndexOf('.')
                 if (dot <= 0) continue
+                val volume = c.getString(4) ?: Volumes.PRIMARY
                 rows += Row(
-                    ContentUris.withAppendedId(collection, c.getLong(0)),
+                    ContentUris.withAppendedId(collection(volume), c.getLong(0)), volume,
                     name.substring(0, dot), name.substring(dot + 1).lowercase(),
                     c.getLong(2), c.getLong(3),
                 )
             }
         }
-        return rows.groupBy { it.base }.map { (base, group) ->
+        return rows.groupBy { it.volume to it.base }.map { (key, group) ->
             val audio = group.firstOrNull { it.ext == AUDIO_EXT }
             val midi = group.firstOrNull { it.ext == MIDI_EXT }
-            Recording(base, audio?.uri, midi?.uri, audio?.duration ?: 0, group.minOf { it.added })
+            Recording(key.second, key.first, audio?.uri, midi?.uri, audio?.duration ?: 0, group.minOf { it.added })
         }.filter { it.audioUri != null || it.midiUri != null }
             .sortedByDescending { it.dateAddedSec }
     }
 
     /** 쓰는 동안 다른 앱(파일 선택기 등)에 보이지 않도록 IS_PENDING=1로 만든다. */
-    fun createPending(name: String, ext: String): Uri {
+    fun createPending(name: String, ext: String, volume: String): Uri {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "$name.$ext")
             put(MediaStore.MediaColumns.MIME_TYPE, if (ext == AUDIO_EXT) "audio/mp4" else "audio/midi")
             put(MediaStore.MediaColumns.RELATIVE_PATH, RELATIVE_PATH)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        return resolver.insert(collection, values) ?: error("MediaStore insert 실패: $name.$ext")
+        return resolver.insert(collection(volume), values) ?: error("MediaStore insert 실패: $name.$ext ($volume)")
     }
 
     fun publish(uri: Uri) {

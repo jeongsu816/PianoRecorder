@@ -6,6 +6,7 @@ import app.pianorecorder.playback.MidiPlayer
 import app.pianorecorder.playback.PhonePlayer
 import app.pianorecorder.record.Recorder
 import app.pianorecorder.storage.RecordingStore
+import app.pianorecorder.storage.Settings
 
 /**
  * 하드웨어 자원(피아노 MIDI 포트, 녹음 세션)은 화면이 아니라 프로세스에 하나만 둔다.
@@ -17,6 +18,7 @@ import app.pianorecorder.storage.RecordingStore
 class PianoApp : Application() {
     val piano by lazy { PianoConnection(this) }
     val store by lazy { RecordingStore(this) }
+    val settings by lazy { Settings(this) }
     val recorder by lazy { Recorder(this, piano, store) }
     val midiPlayer by lazy { MidiPlayer(piano) }
     val phonePlayer by lazy { PhonePlayer(this) }
