@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import app.pianorecorder.R
 import app.pianorecorder.storage.Volume
+import app.pianorecorder.storage.Volumes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -110,7 +111,14 @@ fun RecordingsScreen(vm: MainViewModel, onRecordClick: () -> Unit) {
                         if (connected) "🎹 연결됨" else "🔌 연결 안 됨",
                         color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     )
-                    IconButton(onClick = { showSettings = true }, enabled = !recording) { Text("⚙️", fontSize = 20.sp) }
+                    // 설정은 저장 위치 하나뿐이라, 고를 SD 카드가 없으면 버튼째 숨긴다 (슬롯 유무는 알 수 없어서 "지금 꽂힌 카드"로 판단).
+                    // 단 SD로 설정해 둔 채 카드를 뺀 경우에는 보여서, 왜 내장 메모리에 저장되는지 알리고 되돌릴 수 있게 한다.
+                    val showStorageSetting = volumes.any { it.removable } || storageVolume != Volumes.PRIMARY
+                    if (showStorageSetting) {
+                        IconButton(onClick = { showSettings = true }, enabled = !recording) { Text("⚙️", fontSize = 20.sp) }
+                    } else {
+                        Spacer(Modifier.width(16.dp))
+                    }
                 },
             )
         },
@@ -291,8 +299,8 @@ private fun StorageDialog(volumes: List<Volume>, selected: String, onSelect: (St
                     }
                 }
                 val note = when {
-                    volumes.none { it.removable } -> "microSD 카드가 없어요. 카드를 넣으면 여기에 나타나요."
                     volumes.none { it.name == selected } -> "선택했던 SD 카드가 빠져 있어서 지금은 내장 메모리에 저장돼요."
+                    volumes.none { it.removable } -> "microSD 카드가 없어요. 카드를 넣으면 여기에 나타나요."
                     else -> "새로 녹음하는 것부터 이 위치에 저장돼요. 이미 있는 녹음은 옮겨지지 않아요."
                 }
                 Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline,
