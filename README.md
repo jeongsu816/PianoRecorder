@@ -4,6 +4,12 @@ Roland FP-30X 디지털 피아노를 Android 폰에 USB 케이블로 연결해�
 
 > An Android app that records a Roland FP-30X digital piano over a single USB cable — MIDI and stereo audio at the same time — and plays recordings back either through the piano (MIDI) or the phone speaker (audio). The UI is Korean only. Design notes and measurements are in [CLAUDE.md](CLAUDE.md) (Korean).
 
+<p>
+  <img src="docs/screenshots/list-portrait.png" alt="녹음 목록 (세로)" height="360">
+  <img src="docs/screenshots/playback-landscape.png" alt="재생 버튼 (가로)" height="360">
+  <img src="docs/screenshots/recording-landscape.png" alt="녹음 중 (가로)" height="360">
+</p>
+
 ## 기능
 
 - 녹음 버튼 하나로 **오디오(m4a)와 MIDI(mid)를 동시에** 녹음
