@@ -37,6 +37,11 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
         }
+        // 개발 빌드는 패키지 이름을 따로 써서, 릴리스 앱이 깔린 아이 폰에도 지우지 않고 나란히 설치해 실험할 수 있게 한다
+        debug {
+            applicationIdSuffix = ".dev"
+            resValue("string", "app_name", "PianoRecorder 개발")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -44,6 +49,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
 }
 

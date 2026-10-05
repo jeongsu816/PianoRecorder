@@ -262,6 +262,17 @@
 - 가로 전환이 폰의 "자동 회전" 설정이 켜져 있을 때만 됨 → `screenOrientation="fullSensor"`로 기기 설정과 무관하게 기울기대로 회전
 - 큰 화면(sw≥600dp)에서는 targetSdk 36 + Android 16+가 방향 고정 값을 무시함. 폰(S20, 폴드 바깥 화면)에는 적용됨 [추측]
 
+### "폰으로" 재생 음량 문제 — 앱에서 해결하지 않기로 결정 (2026-10-05)
+- 증상: 아이가 폰 미디어 음량을 0으로 두는데, 케이블이 꽂힌 상태에서 "폰으로" 재생하면 안 들리고, 음량 버튼은 피아노(USB) 음량을 바꿈
+- 원인 [확인, S20 dumpsys audio]: STREAM_MUSIC 음량은 출력 장치별로 저장됨(speaker 0, usb_device 5).
+  폰 스피커로 재생 중이어도 음량 버튼은 usb_device 값을 바꿈
+- 시도 1: 재생 중 음량 버튼을 앱이 받아 `adjustStreamVolume(STREAM_MUSIC)` → 역시 usb_device가 바뀜. 실패
+  (셸의 `cmd media_session volume`이 한때 speaker를 바꾼 적이 있으나 조건 불명, 재현 안 됨)
+- 시도 2: 피아노 연결 시 통화 음성 경로(USAGE_VOICE_COMMUNICATION + setCommunicationDevice(스피커), STREAM_VOICE_CALL 최소 1)
+  → 구현해 개발 빌드로 설치했으나, 사용자 판단으로 채택 안 함
+- 결정: 앱은 손대지 않고 "소리가 안 나면 케이블을 빼고 음량을 올린다"로 안내 (사용자 결정)
+- 부산물: 개발 빌드는 `applicationIdSuffix=".dev"`, 이름 "PianoRecorder 개발" → 릴리스 앱이 깔린 폰에도 나란히 설치해 실험 가능
+
 ### 향후 아이디어
 - **겹쳐 녹음(오버더빙)**: 1트랙을 피아노로 재생하면서 2트랙을 다른 음색으로 녹음.
   MIDI 송수신 동시 동작은 [확인]. 오디오는 피아노가 섞어서 보내므로 합쳐진 소리가 녹음됨.
